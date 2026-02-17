@@ -1,7 +1,7 @@
 // Admin App
 let adminPassword = '';
 let currentCategoryId = null;
-let pendingUndo = null;
+let ordersRefreshInterval = null;
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -17,51 +17,13 @@ async function apiCall(endpoint, options = {}) {
   return response.json();
 }
 
-// Toast & Undo
+// Toast
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;
   t.classList.remove('hidden');
   setTimeout(() => t.classList.add('hidden'), 3000);
 }
-
-function showUndo(text, action) {
-  const bar = $('#undoBar');
-  $('#undoText').textContent = text;
-  bar.classList.remove('hidden');
-  if (pendingUndo?.timer) clearTimeout(pendingUndo.timer);
-  pendingUndo = { ...action, timer: setTimeout(() => hideUndo(), 10000) };
-}
-
-function hideUndo() {
-  $('#undoBar').classList.add('hidden');
-  pendingUndo = null;
-}
-
-$('#undoBtn').onclick = async () => {
-  if (!pendingUndo) return;
-  const { type, payload } = pendingUndo;
-  
-  try {
-    if (type === 'reset') {
-      await apiCall('/session/open', {
-        method: 'POST',
-        body: JSON.stringify({ table_id: payload.tableId })
-      });
-      toast('Reset annullato');
-    } else if (type === 'delete') {
-      await apiCall('/tables', {
-        method: 'POST',
-        body: JSON.stringify({ id: payload.tableId, label: `Tavolo ${payload.tableId}` })
-      });
-      toast('Eliminazione annullata');
-    }
-    renderTables();
-  } catch (e) {
-    toast('Errore annullamento: ' + e.message);
-  }
-  hideUndo();
-};
 
 // Login
 function requireLogin() {
@@ -75,11 +37,6 @@ function requireLogin() {
     modal.classList.add('hidden');
     boot();
   };
-  
-  $('#logoutBtn').onclick = () => {
-    adminPassword = '';
-    modal.classList.remove('hidden');
-  };
 }
 
 // Tabs
@@ -91,20 +48,36 @@ function setupTabs() {
       const id = btn.dataset.tab;
       $$('.tab').forEach(t => t.classList.remove('active'));
       $(`#tab-${id}`).classList.add('active');
+      
       if (id === 'stats') setTimeout(() => renderStats(), 50);
-      if (id === 'orders') renderOrders();
+      if (id === 'orders') {
+        renderOrders();
+        startOrdersAutoRefresh();
+      } else {
+        stopOrdersAutoRefresh();
+      }
     };
   });
 }
 
 // TAVOLI
+function formatElapsedTime(openedAt) {
+  const now = Date.now();
+  const diff = now - openedAt;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 async function renderTables() {
   try {
     const { tables } = await apiCall('/tables');
     const list = $('#tablesList');
     list.innerHTML = '';
     
-    // Popola filtro ordini
     const filterSel = $('#ordersFilterTable');
     filterSel.innerHTML = '<option value="">Tutti i tavoli</option>';
     
@@ -116,29 +89,35 @@ async function renderTables() {
       
       const card = document.createElement('div');
       card.className = 'card';
-      const badge = table.active_session
-        ? `<span class="badge open">In sessione · PIN ${table.active_session.pin}</span>`
-        : `<span class="badge closed">Non attivo</span>`;
+      
+      let badge = `<span class="badge closed">Non attivo</span>`;
+      let timer = '';
+      
+      if (table.active_session) {
+        const elapsed = formatElapsedTime(table.active_session.opened_at);
+        badge = `<span class="badge open">In sessione · PIN ${table.active_session.pin}</span>`;
+        timer = `<div class="table-timer">Aperto da: ${elapsed}</div>`;
+      }
       
       card.innerHTML = `
         <h3>Tavolo ${table.id} ${badge}</h3>
+        ${timer}
         <div class="row">
           <button data-act="open" data-id="${table.id}" class="btn primary">Apri sessione</button>
           <button data-act="reset" data-id="${table.id}" class="btn warn">Reset</button>
           <button data-act="qr" data-id="${table.id}" class="btn">Mostra QR</button>
-          <button data-act="delete" data-id="${table.id}" class="btn danger">Elimina</button>
         </div>
       `;
       
       card.querySelector('[data-act="open"]').onclick = () => openSession(table.id);
       card.querySelector('[data-act="reset"]').onclick = () => resetSession(table.id);
       card.querySelector('[data-act="qr"]').onclick = () => showQr(table.id);
-      card.querySelector('[data-act="delete"]').onclick = () => deleteTable(table.id);
       
       list.appendChild(card);
     });
     
-    updateKpi(tables);
+    // Aggiorna timer ogni minuto
+    setTimeout(renderTables, 60000);
   } catch (e) {
     toast('Errore caricamento tavoli: ' + e.message);
   }
@@ -162,8 +141,7 @@ async function openSession(tableId) {
 }
 
 async function resetSession(tableId) {
-  if (!confirm(`Chiudere la sessione del Tavolo ${tableId}?`)) return;
-  if (!confirm('Conferma: nessuno potrà più ordinare con il PIN attuale.')) return;
+  if (!confirm(`Chiudere la sessione del Tavolo ${tableId}? Nessuno potrà più ordinare.`)) return;
   
   try {
     await apiCall('/session/close', {
@@ -171,7 +149,7 @@ async function resetSession(tableId) {
       body: JSON.stringify({ table_id: tableId })
     });
     
-    showUndo(`Sessione Tavolo ${tableId} chiusa.`, { type: 'reset', payload: { tableId } });
+    toast(`Sessione Tavolo ${tableId} chiusa.`);
     renderTables();
   } catch (e) {
     toast('Errore reset sessione: ' + e.message);
@@ -179,7 +157,7 @@ async function resetSession(tableId) {
 }
 
 function showQr(tableId) {
-  const base = $('#ordersBaseUrl').value.trim() || CONFIG.ORDERS_SITE_BASE;
+  const base = CONFIG.ORDERS_SITE_BASE;
   const url = `${base}?table=${tableId}`;
   
   $('#qrTableNumber').textContent = tableId;
@@ -193,28 +171,8 @@ function showQr(tableId) {
   $('#qrModal').classList.remove('hidden');
 }
 
-async function deleteTable(tableId) {
-  if (!confirm(`Eliminare Tavolo ${tableId}? Il QR resta valido se lo ricrei.`)) return;
-  if (!confirm('Conferma eliminazione?')) return;
-  
-  try {
-    await apiCall(`/tables/${tableId}`, { method: 'DELETE' });
-    showUndo(`Tavolo ${tableId} eliminato.`, { type: 'delete', payload: { tableId } });
-    renderTables();
-  } catch (e) {
-    toast('Errore eliminazione tavolo: ' + e.message);
-  }
-}
-
 $('#closePinModal').onclick = () => $('#pinModal').classList.add('hidden');
 $('#closeQrModal').onclick = () => $('#qrModal').classList.add('hidden');
-
-$('#saveBaseUrl').onclick = () => {
-  const val = $('#ordersBaseUrl').value.trim();
-  if (!val) return alert('Inserisci URL');
-  localStorage.setItem('ordersBaseUrl', val);
-  toast('URL salvato');
-};
 
 $('#addTableBtn').onclick = async () => {
   const id = $('#newTableId').value.trim();
@@ -234,6 +192,18 @@ $('#addTableBtn').onclick = async () => {
 };
 
 // ORDINI
+function startOrdersAutoRefresh() {
+  if (ordersRefreshInterval) return;
+  ordersRefreshInterval = setInterval(renderOrders, 5000); // refresh ogni 5 secondi
+}
+
+function stopOrdersAutoRefresh() {
+  if (ordersRefreshInterval) {
+    clearInterval(ordersRefreshInterval);
+    ordersRefreshInterval = null;
+  }
+}
+
 async function renderOrders() {
   try {
     const tableFilter = $('#ordersFilterTable').value;
@@ -254,7 +224,11 @@ async function renderOrders() {
     
     orders.forEach(order => {
       const card = document.createElement('div');
-      card.className = 'card order-card';
+      let cardClass = 'order-card pending';
+      if (order.state === 'servito') cardClass = 'order-card servito';
+      if (order.state === 'annullato') cardClass = 'order-card annullato';
+      
+      card.className = cardClass;
       
       const itemsHtml = order.items.map(it => 
         `${it.item_name} ×${it.quantity} (${parseFloat(it.unit_price_eur).toFixed(2)}€)`
@@ -262,23 +236,23 @@ async function renderOrders() {
       
       const date = new Date(order.created_at).toLocaleString('it-IT');
       
+      let statusText = 'In attesa';
+      if (order.state === 'servito') statusText = 'Servito ✅';
+      if (order.state === 'annullato') statusText = 'Annullato ❌';
+      
       card.innerHTML = `
         <div class="order-header">
           <strong>Tavolo ${order.table_id}</strong>
-          <span class="badge ${order.state}">${order.state}</span>
+          <span>${statusText}</span>
         </div>
         <div class="hint">${date}</div>
         <div class="order-items">${itemsHtml}</div>
         <div class="order-actions">
-          <button data-act="accept" data-id="${order.id}" class="btn">Accetta</button>
-          <button data-act="prep" data-id="${order.id}" class="btn">In preparazione</button>
           <button data-act="served" data-id="${order.id}" class="btn ok">Servito</button>
           <button data-act="cancel" data-id="${order.id}" class="btn danger">Annulla</button>
         </div>
       `;
       
-      card.querySelector('[data-act="accept"]').onclick = () => changeOrderState(order.id, 'accettato');
-      card.querySelector('[data-act="prep"]').onclick = () => changeOrderState(order.id, 'in-preparazione');
       card.querySelector('[data-act="served"]').onclick = () => changeOrderState(order.id, 'servito');
       card.querySelector('[data-act="cancel"]').onclick = () => changeOrderState(order.id, 'annullato');
       
@@ -295,7 +269,7 @@ async function changeOrderState(orderId, newState) {
       method: 'PATCH',
       body: JSON.stringify({ state: newState })
     });
-    toast(`Ordine aggiornato a: ${newState}`);
+    toast(`Ordine ${newState}`);
     renderOrders();
   } catch (e) {
     toast('Errore aggiornamento ordine: ' + e.message);
@@ -304,7 +278,6 @@ async function changeOrderState(orderId, newState) {
 
 $('#ordersFilterTable').onchange = renderOrders;
 $('#ordersFilterState').onchange = renderOrders;
-$('#refreshOrders').onclick = renderOrders;
 
 // MENÙ
 async function renderMenu() {
@@ -512,8 +485,6 @@ $('#importMenuJsonBtn').onclick = () => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
-      // Elimina tutto e ricrea (semplificato)
       alert('Import manuale: usa console SQL D1 per import massivo.');
     } catch (e) {
       alert('Errore JSON: ' + e.message);
@@ -547,7 +518,7 @@ async function renderStats() {
         datasets: [{
           label: 'Quantità venduta',
           data: topItems.top_items.map(i => i.total),
-          backgroundColor: '#22c55e'
+          backgroundColor: '#3b82f6'
         }]
       },
       options: { responsive: true, maintainAspectRatio: false }
@@ -561,8 +532,8 @@ async function renderStats() {
         datasets: [{
           label: 'Tavoli aperti',
           data: tablesOpened.tables_opened.map(t => t.count),
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37,99,235,.25)'
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.25)'
         }]
       },
       options: { responsive: true, maintainAspectRatio: false }
@@ -602,13 +573,6 @@ $('#exportStatsCsv').onclick = async () => {
   }
 };
 
-// KPI
-function updateKpi(tables) {
-  const open = tables.filter(t => t.active_session).length;
-  $('#kpi-tables-open').textContent = open;
-  // Altri KPI richiedono chiamate API aggiuntive (opzionale)
-}
-
 // Boot
 async function boot() {
   try {
@@ -629,8 +593,3 @@ async function boot() {
 // Init
 setupTabs();
 requireLogin();
-
-// Carica URL salvato
-const savedUrl = localStorage.getItem('ordersBaseUrl');
-if (savedUrl) $('#ordersBaseUrl').value = savedUrl;
-else $('#ordersBaseUrl').value = CONFIG.ORDERS_SITE_BASE;
