@@ -1,162 +1,86 @@
-<!doctype html>
-<html lang="it">
-<head>
-  <meta charset="utf-8">
-  <title>Gestione Ordini</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1e40af">
-  <link href="./style.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-</head>
-<body>
-  <header class="topbar">
-    <h1>Gestione Bar</h1>
-  </header>
+:root{
+  --bg:#1a1f36; --card:#242b4a; --text:#ffffff; --muted:#94a3b8; --border:#3b4575;
+  --primary:#3b82f6; --danger:#ef4444; --ok:#22c55e; --warn:#f59e0b;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5}
 
-  <div id="toast" class="toast hidden" aria-live="polite"></div>
+.topbar{display:flex;gap:12px;align-items:center;justify-content:center;padding:20px 16px;border-bottom:2px solid var(--primary);background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);flex-wrap:wrap}
+.topbar h1{margin:0;font-size:clamp(20px,4vw,26px);font-weight:700;color:#fff}
 
-  <div id="loginModal" class="modal">
-    <div class="modal-content">
-      <h2>Accesso Admin</h2>
-      <p>Inserisci la password amministratore.</p>
-      <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
-      <div class="row">
-        <button id="loginSubmit" class="btn primary">Accedi</button>
-      </div>
-    </div>
-  </div>
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:10px;background:#242b4a;border:2px solid var(--primary);padding:12px 20px;border-radius:var(--radius);z-index:1001;max-width:90%;box-shadow:0 8px 24px rgba(59,130,246,.3);color:#fff;font-weight:500}
+.hidden{display:none!important}
 
-  <nav class="tabs" role="navigation">
-    <button class="tab-btn active" data-tab="tables">Tavoli</button>
-    <button class="tab-btn" data-tab="orders">Ordini</button>
-    <button class="tab-btn" data-tab="menu">Menù</button>
-    <button class="tab-btn" data-tab="stats">Statistiche</button>
-  </nav>
+.tabs{display:flex;gap:6px;padding:12px 12px;border-bottom:2px solid var(--border);background:var(--card);overflow-x:auto;position:sticky;top:0;z-index:100}
+.tab-btn{padding:12px 20px;border:2px solid transparent;border-radius:999px;background:var(--bg);color:var(--text);cursor:pointer;font-size:15px;min-height:48px;white-space:nowrap;flex-shrink:0;font-weight:600;transition:all .2s}
+.tab-btn.active{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(59,130,246,.4)}
 
-  <main>
-    <!-- TAVOLI -->
-    <section id="tab-tables" class="tab active">
-      <div class="card">
-        <h2>Gestione Tavoli</h2>
-        <div class="form-group">
-          <label>Crea nuovo tavolo:</label>
-          <div class="row">
-            <input id="newTableId" type="number" min="1" step="1" placeholder="ID numerico (es. 11)" inputmode="numeric">
-            <button id="addTableBtn" class="btn primary">Crea tavolo</button>
-          </div>
-        </div>
-      </div>
-      <div id="tablesList" class="grid"></div>
-    </section>
+main{padding:16px 16px 84px}
+.tab{display:none}
+.tab.active{display:block}
 
-    <!-- ORDINI -->
-    <section id="tab-orders" class="tab">
-      <div class="card">
-        <h2>Ordini in tempo reale</h2>
-        <div class="filters">
-          <select id="ordersFilterTable">
-            <option value="">Tutti i tavoli</option>
-          </select>
-          <select id="ordersFilterState">
-            <option value="">Tutti gli stati</option>
-            <option value="richiesta">In attesa</option>
-            <option value="servito">Servito</option>
-            <option value="annullato">Annullato</option>
-          </select>
-        </div>
-      </div>
-      <div id="ordersList" class="list"></div>
-    </section>
+.card{background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.card h2{margin:0 0 16px 0;font-size:20px;color:var(--primary)}
+.card h3{margin:0 0 12px 0;font-size:18px;color:#fff}
+.card h4{margin:0 0 12px 0;font-size:16px;color:#fff}
 
-    <!-- MENÙ -->
-    <section id="tab-menu" class="tab">
-      <div class="card">
-        <h2>Gestione Menù</h2>
-        <div class="row">
-          <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
-          <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
-        </div>
-        <div class="menu-layout">
-          <aside>
-            <h3>Categorie</h3>
-            <ul id="categoryList"></ul>
-            <div class="form-group">
-              <input id="newCategoryName" placeholder="Nuova categoria">
-              <button id="addCategoryBtn" class="btn primary">Aggiungi</button>
-            </div>
-          </aside>
-          <section class="menu-items">
-            <h3 id="itemsTitle">Articoli</h3>
-            <div id="itemsList" class="list"></div>
-            <div class="card">
-              <h4>Aggiungi articolo</h4>
-              <div class="form-group">
-                <input id="itemName" placeholder="Nome articolo">
-                <input id="itemPrice" type="number" step="0.01" min="0" placeholder="Prezzo (€)" inputmode="decimal">
-              </div>
-              <textarea id="itemDescription" placeholder="Descrizione (facoltativa)"></textarea>
-              <div class="row">
-                <label><input type="checkbox" id="itemTagNovita"> Novità</label>
-                <label><input type="checkbox" id="itemTagBio"> Bio</label>
-                <label><input type="checkbox" id="itemVisible" checked> Visibile</label>
-              </div>
-              <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
-            </div>
-          </section>
-        </div>
-      </div>
-    </section>
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.list{display:flex;flex-direction:column;gap:12px}
+.form-group{margin:12px 0}
+.form-group label{display:block;margin-bottom:8px;color:var(--muted);font-size:14px;font-weight:500}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 
-    <!-- STATISTICHE -->
-    <section id="tab-stats" class="tab">
-      <div class="card">
-        <h2>Statistiche</h2>
-        <div class="filters">
-          <input type="date" id="statsFrom">
-          <input type="date" id="statsTo">
-          <button id="refreshStats" class="btn">Aggiorna</button>
-          <button id="exportStatsCsv" class="btn">Export CSV</button>
-        </div>
-        <div class="charts-grid">
-          <div class="card">
-            <h3>Top prodotti venduti</h3>
-            <div class="chart-box"><canvas id="topItemsChart"></canvas></div>
-          </div>
-          <div class="card">
-            <h3>Tavoli aperti per giorno</h3>
-            <div class="chart-box"><canvas id="tablesOpenedChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
+input,textarea,select{width:100%;background:var(--bg);border:2px solid var(--border);color:var(--text);padding:12px;border-radius:var(--radius);font-size:16px;transition:border-color .2s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary)}
+textarea{min-height:80px;resize:vertical}
+input[type="checkbox"]{width:auto;margin-right:6px}
 
-  <!-- MODAL PIN -->
-  <div id="pinModal" class="modal hidden">
-    <div class="modal-content pin">
-      <h2>PIN del Tavolo <span id="pinModalTable"></span></h2>
-      <div id="pinDigits" class="pin-digits" aria-live="polite">1234</div>
-      <p class="hint">Comunica questo PIN ai clienti del tavolo.</p>
-      <button id="closePinModal" class="btn primary">Chiudi</button>
-    </div>
-  </div>
+.btn{background:#475569;color:#fff;border:none;border-radius:999px;padding:12px 20px;cursor:pointer;min-height:48px;font-size:15px;font-weight:600;transition:all .2s}
+.btn.primary{background:var(--primary);box-shadow:0 4px 12px rgba(59,130,246,.3)}
+.btn.primary:hover{box-shadow:0 6px 16px rgba(59,130,246,.4)}
+.btn.danger{background:var(--danger);box-shadow:0 4px 12px rgba(239,68,68,.3)}
+.btn.warn{background:var(--warn);color:#000;box-shadow:0 4px 12px rgba(245,158,11,.3)}
+.btn.ok{background:var(--ok);box-shadow:0 4px 12px rgba(34,197,94,.3)}
+.btn:active{transform:scale(0.97)}
 
-  <!-- MODAL QR -->
-  <div id="qrModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>QR del tavolo <span id="qrTableNumber"></span></h3>
-      <div id="qrContainer" class="qr-box"></div>
-      <p id="qrLink" class="hint"></p>
-      <button id="closeQrModal" class="btn">Chiudi</button>
-    </div>
-  </div>
+.badge{display:inline-block;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+.badge.open{background:#22c55e;color:#fff}
+.badge.closed{background:#64748b;color:#fff}
 
-  <footer class="footer">
-    <span>Sistema gestione ordini</span>
-  </footer>
+.table-timer{color:var(--muted);font-size:13px;margin-top:4px}
 
-  <script src="./config.js"></script>
-  <script src="./app.js"></script>
-</body>
-</html>
+.order-card{position:relative;border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.order-card.pending{background:#fff;color:#1a1f36;border:2px solid #e2e8f0}
+.order-card.servito{background:#22c55e;color:#fff;border:2px solid #16a34a}
+.order-card.annullato{background:#ef4444;color:#fff;border:2px solid #dc2626}
+.order-card .order-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.order-card .order-items{background:rgba(0,0,0,.1);border-radius:8px;padding:12px;margin:8px 0;font-size:14px;line-height:1.6}
+.order-card .order-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+.menu-layout{display:grid;grid-template-columns:280px 1fr;gap:12px}
+#categoryList{list-style:none;padding:0;margin:0}
+#categoryList li{display:flex;justify-content:space-between;align-items:center;padding:12px;border:2px solid var(--border);border-radius:var(--radius);margin-bottom:8px;flex-wrap:wrap;gap:8px;background:var(--bg)}
+#categoryList li span:first-child{flex:1;min-width:100px;font-weight:600}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:1000}
+.modal-content{background:var(--card);border:2px solid var(--primary);border-radius:var(--radius);padding:24px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(59,130,246,.3)}
+.modal-content.pin{text-align:center}
+.pin-digits{font-size:clamp(40px,12vw,64px);font-weight:800;letter-spacing:clamp(6px,2vw,12px);background:var(--bg);border:2px solid var(--primary);border-radius:var(--radius);padding:24px;margin:20px auto;user-select:all;color:var(--primary)}
+
+.qr-box{display:flex;align-items:center;justify-content:center;min-height:260px;padding:12px}
+.chart-box{position:relative;height:300px}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+
+.hint{color:var(--muted);font-size:13px;margin:6px 0}
+.footer{padding:16px;border-top:2px solid var(--border);color:var(--muted);text-align:center;font-size:13px}
+
+@media (max-width: 768px){
+  .tabs{position:fixed;bottom:0;left:0;right:0;justify-content:space-around;border-top:2px solid var(--border);border-bottom:none;z-index:100}
+  .menu-layout{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
+  .charts-grid{grid-template-columns:1fr}
+  .chart-box{height:250px}
+}
