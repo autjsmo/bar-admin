@@ -390,5 +390,265 @@ async function renderMenu() {
       ul.appendChild(li);
     });
     
-    if (!*
-
+    if (!currentCategoryId && categories[0]) {
+      currentCategoryId = categories[0].id;
+      renderItems(items.filter(i => i.category_id === categories[0].id), categories[0].name);
+    }
+  } catch (e) {
+    toast('Errore caricamento menù: ' + e.message);
+  }
+}
+
+function renderItems(items, categoryName) {
+  $('#itemsTitle').textContent = `Articoli · ${categoryName}`;
+  const list = $('#itemsList');
+  list.innerHTML = '';
+  
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    
+    const tags = item.tags ? JSON.parse(item.tags).filter(t => t.toLowerCase() !== 'bio') : [];
+    const tagsHtml = tags.length ? `<div class="hint">🏷️ ${tags.join(' · ')}</div>` : '';
+    
+    card.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <strong>${item.name}</strong>
+        <span style="font-size:17px;font-weight:700;color:var(--primary)">${parseFloat(item.price_eur).toFixed(2)} €</span>
+      </div>
+      ${item.description ? `<div class="hint">${item.description}</div>` : ''}
+      ${tagsHtml}
+      <div class="hint">${item.visible ? '👁️ Visibile' : '🚫 Nascosto'}</div>
+      <div class="row" style="justify-content:flex-end">
+        <button data-act="edit" class="btn">Modifica</button>
+        <button data-act="delete" class="btn danger">Elimina</button>
+      </div>
+    `;
+    
+    card.querySelector('[data-act="edit"]').onclick = () => editItem(item);
+    card.querySelector('[data-act="delete"]').onclick = () => deleteItem(item.id);
+    
+    list.appendChild(card);
+  });
+}
+
+async function editItem(item) {
+  const name = prompt('Nome', item.name) || item.name;
+  const price = prompt('Prezzo (€)', item.price_eur) || item.price_eur;
+  const desc = prompt('Descrizione', item.description || '') || item.description;
+  const visible = confirm('Articolo visibile? OK=sì');
+  
+  try {
+    await apiCall(`/menu/items/${item.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, price_eur: parseFloat(price), description: desc, visible })
+    });
+    toast('Articolo aggiornato');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
+async function deleteItem(itemId) {
+  if (!confirm('Eliminare articolo?')) return;
+  try {
+    await apiCall(`/menu/items/${itemId}`, { method: 'DELETE' });
+    toast('Articolo eliminato');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
+$('#addCategoryBtn').onclick = async () => {
+  const name = $('#newCategoryName').value.trim();
+  if (!name) return alert('Inserisci nome categoria');
+  
+  try {
+    await apiCall('/menu/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name, position: 999 })
+    });
+    $('#newCategoryName').value = '';
+    toast('Categoria aggiunta');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+};
+
+$('#addItemBtn').onclick = async () => {
+  if (!currentCategoryId) return alert('Seleziona una categoria');
+  
+  const name = $('#itemName').value.trim();
+  const price = parseFloat($('#itemPrice').value);
+  if (!name || isNaN(price) || price < 0) return alert('Nome e prezzo validi richiesti');
+  
+  const desc = $('#itemDescription').value.trim();
+  const tags = [];
+  if ($('#itemTagNovita').checked) tags.push('Novità');
+  const visible = $('#itemVisible').checked;
+  
+  try {
+    await apiCall('/menu/items', {
+      method: 'POST',
+      body: JSON.stringify({
+        category_id: currentCategoryId,
+        name,
+        price_eur: price,
+        description: desc,
+        tags,
+        visible,
+        position: 999
+      })
+    });
+    
+    $('#itemName').value = '';
+    $('#itemPrice').value = '';
+    $('#itemDescription').value = '';
+    $('#itemTagNovita').checked = false;
+    $('#itemVisible').checked = true;
+    
+    toast('Articolo aggiunto');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+};
+
+$('#exportMenuJsonBtn').onclick = async () => {
+  try {
+    const { categories, items } = await apiCall('/menu/admin');
+    const blob = new Blob([JSON.stringify({ categories, items }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'menu.json';
+    a.click();
+  } catch (e) {
+    toast('Errore export: ' + e.message);
+  }
+};
+
+$('#importMenuJsonBtn').onclick = () => {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json';
+  inp.onchange = async () => {
+    const file = inp.files[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      alert('Import manuale: usa console SQL D1 per import massivo.');
+    } catch (e) {
+      alert('Errore JSON: ' + e.message);
+    }
+  };
+  inp.click();
+};
+
+// STATISTICHE
+let topItemsChart, tablesOpenedChart;
+
+async function renderStats() {
+  try {
+    const from = $('#statsFrom').value;
+    const to = $('#statsTo').value;
+    
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    
+    const [topItems, tablesOpened] = await Promise.all([
+      apiCall(`/stats/top-items?${params}`),
+      apiCall(`/stats/tables-opened?${params}`)
+    ]);
+    
+    if (topItemsChart) topItemsChart.destroy();
+    topItemsChart = new Chart($('#topItemsChart'), {
+      type: 'bar',
+      data: {
+        labels: topItems.top_items.map(i => i.item_name),
+        datasets: [{
+          label: 'Quantità venduta',
+          data: topItems.top_items.map(i => i.total),
+          backgroundColor: '#3b82f6',
+          borderRadius: 8
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+    
+    if (tablesOpenedChart) tablesOpenedChart.destroy();
+    tablesOpenedChart = new Chart($('#tablesOpenedChart'), {
+      type: 'line',
+      data: {
+        labels: tablesOpened.tables_opened.map(t => t.day),
+        datasets: [{
+          label: 'Tavoli aperti',
+          data: tablesOpened.tables_opened.map(t => t.count),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.2)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  } catch (e) {
+    toast('Errore statistiche: ' + e.message);
+  }
+}
+
+$('#refreshStats').onclick = renderStats;
+
+$('#exportStatsCsv').onclick = async () => {
+  try {
+    const from = $('#statsFrom').value;
+    const to = $('#statsTo').value;
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    
+    const [topItems, tablesOpened] = await Promise.all([
+      apiCall(`/stats/top-items?${params}`),
+      apiCall(`/stats/tables-opened?${params}`)
+    ]);
+    
+    let csv = 'giorno,tavoli_aperti\n';
+    tablesOpened.tables_opened.forEach(t => csv += `${t.day},${t.count}\n`);
+    csv += '\nprodotto,quantita\n';
+    topItems.top_items.forEach(i => csv += `${i.item_name},${i.total}\n`);
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'statistiche.csv';
+    a.click();
+  } catch (e) {
+    toast('Errore export CSV: ' + e.message);
+  }
+};
+
+// Boot
+async function boot() {
+  try {
+    await renderTables();
+    await renderMenu();
+    await renderStats();
+  } catch (e) {
+    if (e.message.includes('401')) {
+      alert('Password errata o non autorizzato');
+      adminPassword = '';
+      requireLogin();
+    } else {
+      toast('Errore inizializzazione: ' + e.message);
+    }
+  }
+}
+
+// Init
+setupTabs();
+requireLogin();
