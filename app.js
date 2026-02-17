@@ -164,8 +164,9 @@ async function showTableDetails(tableId, activeSession) {
   }
   
   try {
+    // Filtra ordini SOLO per la sessione corrente
     const params = new URLSearchParams();
-    params.append('table_id', tableId);
+    params.append('session_id', activeSession.id);
     
     const { orders } = await apiCall(`/orders?${params}`);
     
