@@ -194,7 +194,7 @@ $('#addTableBtn').onclick = async () => {
 // ORDINI
 function startOrdersAutoRefresh() {
   if (ordersRefreshInterval) return;
-  ordersRefreshInterval = setInterval(renderOrders, 5000); // refresh ogni 5 secondi
+  ordersRefreshInterval = setInterval(renderOrders, 5000);
 }
 
 function stopOrdersAutoRefresh() {
