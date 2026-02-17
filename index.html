@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Admin · QR Ordini</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <link href="./style.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Admin · QR Ordini</h1>
+    <div class="kpi">
+      <div class="kpi-item"><span id="kpi-tables-open">0</span><label>Tavoli aperti</label></div>
+      <div class="kpi-item"><span id="kpi-orders-today">0</span><label>Ordini oggi</label></div>
+      <div class="kpi-item"><span id="kpi-top-item">—</span><label>Top prodotto</label></div>
+    </div>
+    <button id="logoutBtn" class="btn danger">Esci</button>
+  </header>
+
+  <div id="toast" class="toast hidden" aria-live="polite"></div>
+  <div id="undoBar" class="undo hidden">
+    <span id="undoText">Azione effettuata.</span>
+    <button id="undoBtn" class="btn">Annulla (10s)</button>
+  </div>
+
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <h2>Accesso Admin</h2>
+      <p>Inserisci la password amministratore.</p>
+      <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
+      <div class="row">
+        <button id="loginSubmit" class="btn primary">Accedi</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabs" role="navigation">
+    <button class="tab-btn active" data-tab="tables">Tavoli</button>
+    <button class="tab-btn" data-tab="orders">Ordini</button>
+    <button class="tab-btn" data-tab="menu">Menù</button>
+    <button class="tab-btn" data-tab="stats">Statistiche</button>
+  </nav>
+
+  <main>
+    <!-- TAVOLI -->
+    <section id="tab-tables" class="tab active">
+      <div class="card">
+        <h2>Gestione Tavoli</h2>
+        <div class="form-group">
+          <label>Base URL Sito Ordini (per QR):</label>
+          <input id="ordersBaseUrl" placeholder="https://auti1175.github.io/bar-ordini/" inputmode="url">
+          <button id="saveBaseUrl" class="btn">Salva URL</button>
+        </div>
+        <div class="form-group">
+          <label>Crea nuovo tavolo:</label>
+          <div class="row">
+            <input id="newTableId" type="number" min="1" step="1" placeholder="ID numerico (es. 11)" inputmode="numeric">
+            <button id="addTableBtn" class="btn primary">Crea tavolo</button>
+          </div>
+        </div>
+      </div>
+      <div id="tablesList" class="grid"></div>
+    </section>
+
+    <!-- ORDINI -->
+    <section id="tab-orders" class="tab">
+      <div class="card">
+        <h2>Ordini</h2>
+        <div class="filters">
+          <select id="ordersFilterTable">
+            <option value="">Tutti i tavoli</option>
+          </select>
+          <select id="ordersFilterState">
+            <option value="">Tutti gli stati</option>
+            <option value="richiesta">Richiesta</option>
+            <option value="accettato">Accettato</option>
+            <option value="in-preparazione">In preparazione</option>
+            <option value="servito">Servito</option>
+            <option value="annullato">Annullato</option>
+          </select>
+          <button id="refreshOrders" class="btn">Aggiorna</button>
+        </div>
+      </div>
+      <div id="ordersList" class="list"></div>
+    </section>
+
+    <!-- MENÙ -->
+    <section id="tab-menu" class="tab">
+      <div class="card">
+        <h2>Gestione Menù</h2>
+        <div class="row">
+          <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
+          <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
+        </div>
+        <div class="menu-layout">
+          <aside>
+            <h3>Categorie</h3>
+            <ul id="categoryList"></ul>
+            <div class="form-group">
+              <input id="newCategoryName" placeholder="Nuova categoria">
+              <button id="addCategoryBtn" class="btn primary">Aggiungi</button>
+            </div>
+          </aside>
+          <section class="menu-items">
+            <h3 id="itemsTitle">Articoli</h3>
+            <div id="itemsList" class="list"></div>
+            <div class="card">
+              <h4>Aggiungi articolo</h4>
+              <div class="form-group">
+                <input id="itemName" placeholder="Nome articolo">
+                <input id="itemPrice" type="number" step="0.01" min="0" placeholder="Prezzo (€)" inputmode="decimal">
+              </div>
+              <textarea id="itemDescription" placeholder="Descrizione (facoltativa)"></textarea>
+              <div class="row">
+                <label><input type="checkbox" id="itemTagNovita"> Novità</label>
+                <label><input type="checkbox" id="itemTagBio"> Bio</label>
+                <label><input type="checkbox" id="itemVisible" checked> Visibile</label>
+              </div>
+              <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATISTICHE -->
+    <section id="tab-stats" class="tab">
+      <div class="card">
+        <h2>Statistiche</h2>
+        <div class="filters">
+          <input type="date" id="statsFrom">
+          <input type="date" id="statsTo">
+          <button id="refreshStats" class="btn">Aggiorna</button>
+          <button id="exportStatsCsv" class="btn">Export CSV</button>
+        </div>
+        <div class="charts-grid">
+          <div class="card">
+            <h3>Top prodotti venduti</h3>
+            <div class="chart-box"><canvas id="topItemsChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Tavoli aperti per giorno</h3>
+            <div class="chart-box"><canvas id="tablesOpenedChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL PIN -->
+  <div id="pinModal" class="modal hidden">
+    <div class="modal-content pin">
+      <h2>PIN del Tavolo <span id="pinModalTable"></span></h2>
+      <div id="pinDigits" class="pin-digits" aria-live="polite">1234</div>
+      <p class="hint">Comunica questo PIN ai clienti del tavolo.</p>
+      <button id="closePinModal" class="btn primary">Chiudi</button>
+    </div>
+  </div>
+
+  <!-- MODAL QR -->
+  <div id="qrModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>QR del tavolo <span id="qrTableNumber"></span></h3>
+      <div id="qrContainer" class="qr-box"></div>
+      <p id="qrLink" class="hint"></p>
+      <button id="closeQrModal" class="btn">Chiudi</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>QR Ordini · Sistema gestione ordini</span>
+  </footer>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
