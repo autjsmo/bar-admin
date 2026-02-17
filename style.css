@@ -67,6 +67,8 @@ input[type="checkbox"]{width:auto;margin-right:8px}
 
 .table-card{position:relative;transition:all .2s}
 .table-card.has-pending-orders{border:3px solid var(--warn);box-shadow:0 0 0 3px rgba(245,158,11,.15)}
+.table-header{cursor:pointer;transition:color .2s}
+.table-header:hover{color:var(--primary)}
 .table-timer{color:var(--muted);font-size:14px;margin-top:8px;font-weight:500}
 
 .order-card{position:relative;border-radius:var(--radius);padding:20px;margin-bottom:16px;background:var(--card);box-shadow:var(--shadow)}
@@ -95,6 +97,57 @@ input[type="checkbox"]{width:auto;margin-right:8px}
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
 
 .hint{color:var(--muted);font-size:14px;margin:8px 0}
+
+/* KPI Stats */
+.stats-kpi{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;
+  margin:24px 0;
+}
+.kpi-card{
+  background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border-radius:var(--radius);
+  padding:24px;
+  text-align:center;
+  box-shadow:var(--shadow-lg);
+  color:#fff;
+}
+.kpi-value{
+  font-size:clamp(28px,5vw,40px);
+  font-weight:900;
+  margin-bottom:8px;
+  letter-spacing:-0.5px;
+}
+.kpi-label{
+  font-size:14px;
+  opacity:0.9;
+  font-weight:600;
+}
+
+/* Modal lista prodotti */
+#allProductsModal .product-list,
+#sessionSummaryModal .product-list{
+  max-height:60vh;
+  overflow-y:auto;
+}
+#allProductsModal .product-item,
+#sessionSummaryModal .product-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:16px;
+  border-bottom:1px solid var(--border);
+  font-size:15px;
+}
+#allProductsModal .product-item:last-child,
+#sessionSummaryModal .product-item:last-child{border-bottom:none}
+#allProductsModal .product-name,
+#sessionSummaryModal .product-name{font-weight:600;flex:1}
+#allProductsModal .product-qty,
+#sessionSummaryModal .product-qty{color:var(--muted);margin:0 16px}
+#allProductsModal .product-revenue,
+#sessionSummaryModal .product-revenue{font-weight:700;color:var(--primary)}
 
 @media (max-width: 768px){
   .tabs{position:fixed;bottom:0;left:0;right:0;border-top:2px solid var(--border);border-bottom:none;z-index:100;background:var(--card)}
