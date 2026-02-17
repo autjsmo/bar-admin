@@ -125,9 +125,29 @@
           <button id="refreshStats" class="btn">Aggiorna</button>
           <button id="exportStatsCsv" class="btn">Export CSV</button>
         </div>
+        
+        <!-- KPI Ricavi -->
+        <div class="stats-kpi">
+          <div class="kpi-card">
+            <div class="kpi-value" id="totalRevenue">0.00 €</div>
+            <div class="kpi-label">Ricavi totali</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-value" id="totalOrders">0</div>
+            <div class="kpi-label">Ordini serviti</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-value" id="avgOrderValue">0.00 €</div>
+            <div class="kpi-label">Valore medio ordine</div>
+          </div>
+        </div>
+        
         <div class="charts-grid">
           <div class="card">
-            <h3>Top prodotti venduti</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <h3 style="margin:0">Top prodotti venduti</h3>
+              <button id="viewAllProducts" class="btn">Vedi tutti</button>
+            </div>
             <div class="chart-box"><canvas id="topItemsChart"></canvas></div>
           </div>
           <div class="card">
