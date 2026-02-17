@@ -4,16 +4,12 @@
   <meta charset="utf-8">
   <title>Gestione Ordini</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1e40af">
+  <meta name="theme-color" content="#ffffff">
   <link href="style.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <h1>Gestione Bar</h1>
-  </header>
-
   <div id="toast" class="toast hidden" aria-live="polite"></div>
 
   <div id="loginModal" class="modal">
@@ -28,26 +24,35 @@
   </div>
 
   <nav class="tabs" role="navigation">
-    <button class="tab-btn active" data-tab="tables">Tavoli</button>
-    <button class="tab-btn" data-tab="orders">Ordini</button>
-    <button class="tab-btn" data-tab="menu">Menù</button>
-    <button class="tab-btn" data-tab="stats">Statistiche</button>
+    <button class="tab-btn active" data-tab="tables">
+      <span class="tab-icon">🍽️</span>
+      <span>Tavoli</span>
+    </button>
+    <button class="tab-btn" data-tab="orders">
+      <span class="tab-icon">📋</span>
+      <span>Ordini</span>
+    </button>
+    <button class="tab-btn" data-tab="menu">
+      <span class="tab-icon">📖</span>
+      <span>Menù</span>
+    </button>
+    <button class="tab-btn" data-tab="stats">
+      <span class="tab-icon">📊</span>
+      <span>Statistiche</span>
+    </button>
   </nav>
 
   <main>
     <!-- TAVOLI -->
     <section id="tab-tables" class="tab active">
-      <div class="card">
-        <h2>Gestione Tavoli</h2>
+      <div id="tablesList" class="grid"></div>
+      <div class="card add-card">
+        <h2>Crea nuovo tavolo</h2>
         <div class="form-group">
-          <label>Crea nuovo tavolo:</label>
-          <div class="row">
-            <input id="newTableId" type="number" min="1" step="1" placeholder="ID numerico (es. 11)" inputmode="numeric">
-            <button id="addTableBtn" class="btn primary">Crea tavolo</button>
-          </div>
+          <input id="newTableId" type="number" min="1" step="1" placeholder="ID numerico (es. 11)" inputmode="numeric">
+          <button id="addTableBtn" class="btn primary">Crea tavolo</button>
         </div>
       </div>
-      <div id="tablesList" class="grid"></div>
     </section>
 
     <!-- ORDINI -->
@@ -73,10 +78,6 @@
     <section id="tab-menu" class="tab">
       <div class="card">
         <h2>Gestione Menù</h2>
-        <div class="row">
-          <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
-          <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
-        </div>
         <div class="menu-layout">
           <aside>
             <h3>Categorie</h3>
@@ -89,7 +90,7 @@
           <section class="menu-items">
             <h3 id="itemsTitle">Articoli</h3>
             <div id="itemsList" class="list"></div>
-            <div class="card">
+            <div class="card add-item-card">
               <h4>Aggiungi articolo</h4>
               <div class="form-group">
                 <input id="itemName" placeholder="Nome articolo">
@@ -98,12 +99,18 @@
               <textarea id="itemDescription" placeholder="Descrizione (facoltativa)"></textarea>
               <div class="row">
                 <label><input type="checkbox" id="itemTagNovita"> Novità</label>
-                <label><input type="checkbox" id="itemTagBio"> Bio</label>
                 <label><input type="checkbox" id="itemVisible" checked> Visibile</label>
               </div>
               <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
             </div>
           </section>
+        </div>
+      </div>
+      <div class="card footer-actions">
+        <h3>Importa/Esporta</h3>
+        <div class="row">
+          <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
+          <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
         </div>
       </div>
     </section>
@@ -151,10 +158,6 @@
       <button id="closeQrModal" class="btn">Chiudi</button>
     </div>
   </div>
-
-  <footer class="footer">
-    <span>Sistema gestione ordini</span>
-  </footer>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
