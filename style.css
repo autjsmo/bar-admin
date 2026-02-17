@@ -1,8 +1,16 @@
 :root{
-  --bg:#1a1f36; --card:#242b4a; --text:#ffffff; --muted:#94a3b8; --border:#3b4575;
-  --primary:#3b82f6; --danger:#ef4444; --ok:#22c55e; --warn:#f59e0b;
+  --bg:#1a1f36;
+  --card:#242b4a;
+  --text:#ffffff;
+  --muted:#94a3b8;
+  --border:#3b4575;
+  --primary:#3b82f6;
+  --danger:#ef4444;
+  --ok:#22c55e;
+  --warn:#f59e0b;
   --radius:12px;
 }
+
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5}
