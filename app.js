@@ -412,5 +412,517 @@ async function renderOrders() {
     const list = $('#ordersList');
     list.innerHTML = '';
     
-    if*
-
+    if (orders.length === 0) {
+      list.innerHTML = '<div class="card"><p class="hint">Nessun ordine trovato.</p></div>';
+      return;
+    }
+    
+    orders.forEach(order => {
+      const card = document.createElement('div');
+      let cardClass = 'order-card pending';
+      if (order.state === 'servito') cardClass = 'order-card servito';
+      if (order.state === 'annullato') cardClass = 'order-card annullato';
+      
+      card.className = cardClass;
+      
+      const itemsHtml = order.items.map(it => 
+        `<div>${it.item_name} <strong>×${it.quantity}</strong> — ${parseFloat(it.unit_price_eur).toFixed(2)}€</div>`
+      ).join('');
+      
+      const date = new Date(order.created_at).toLocaleString('it-IT');
+      
+      let statusIcon = '⏳';
+      let statusText = 'In attesa';
+      if (order.state === 'servito') { statusIcon = '✅'; statusText = 'Servito'; }
+      if (order.state === 'annullato') { statusIcon = '❌'; statusText = 'Annullato'; }
+      
+      card.innerHTML = `
+        <div class="order-header">
+          <strong>Tavolo ${order.table_id}</strong>
+          <span>${statusIcon} ${statusText}</span>
+        </div>
+        <div class="hint">${date}</div>
+        <div class="order-items">${itemsHtml}</div>
+        <div class="order-actions">
+          <button data-act="served" data-id="${order.id}" class="btn ok">✅ Servito</button>
+          <button data-act="cancel" data-id="${order.id}" class="btn danger">❌ Annulla</button>
+        </div>
+      `;
+      
+      card.querySelector('[data-act="served"]').onclick = () => changeOrderState(order.id, 'servito');
+      card.querySelector('[data-act="cancel"]').onclick = () => changeOrderState(order.id, 'annullato');
+      
+      list.appendChild(card);
+    });
+  } catch (e) {
+    toast('Errore caricamento ordini: ' + e.message);
+  }
+}
+
+async function changeOrderState(orderId, newState) {
+  try {
+    await apiCall(`/orders/${orderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ state: newState })
+    });
+    toast(`Ordine ${newState}`);
+    renderOrders();
+    renderTables();
+  } catch (e) {
+    toast('Errore aggiornamento ordine: ' + e.message);
+  }
+}
+
+$('#ordersFilterTable').onchange = renderOrders;
+$('#ordersFilterState').onchange = renderOrders;
+
+// MENÙ
+async function renderMenu() {
+  try {
+    const { categories, items } = await apiCall('/menu/admin');
+    
+    const ul = $('#categoryList');
+    ul.innerHTML = '';
+    
+    categories.forEach(cat => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span>${cat.name}</span>
+        <div class="row">
+          <button class="btn" data-act="select">Apri</button>
+          <button class="btn" data-act="rename">Rinomina</button>
+          <button class="btn danger" data-act="delete">Elimina</button>
+        </div>
+      `;
+      
+      li.querySelector('[data-act="select"]').onclick = () => {
+        currentCategoryId = cat.id;
+        renderItems(items.filter(i => i.category_id === cat.id), cat.name);
+      };
+      
+      li.querySelector('[data-act="rename"]').onclick = async () => {
+        const name = prompt('Nuovo nome categoria', cat.name);
+        if (!name) return;
+        try {
+          await apiCall(`/menu/categories/${cat.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ name })
+          });
+          toast('Categoria rinominata');
+          renderMenu();
+        } catch (e) {
+          toast('Errore: ' + e.message);
+        }
+      };
+      
+      li.querySelector('[data-act="delete"]').onclick = async () => {
+        if (!confirm('Eliminare categoria e articoli?')) return;
+        try {
+          await apiCall(`/menu/categories/${cat.id}`, { method: 'DELETE' });
+          toast('Categoria eliminata');
+          renderMenu();
+        } catch (e) {
+          toast('Errore: ' + e.message);
+        }
+      };
+      
+      ul.appendChild(li);
+    });
+    
+    if (!currentCategoryId && categories[0]) {
+      currentCategoryId = categories[0].id;
+      renderItems(items.filter(i => i.category_id === categories[0].id), categories[0].name);
+    }
+  } catch (e) {
+    toast('Errore caricamento menù: ' + e.message);
+  }
+}
+
+function renderItems(items, categoryName) {
+  $('#itemsTitle').textContent = `Articoli · ${categoryName}`;
+  const list = $('#itemsList');
+  list.innerHTML = '';
+  
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    
+    const tags = item.tags ? JSON.parse(item.tags).filter(t => t.toLowerCase() !== 'bio') : [];
+    const tagsHtml = tags.length ? `<div class="hint">🏷️ ${tags.join(' · ')}</div>` : '';
+    
+    card.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <strong>${item.name}</strong>
+        <span style="font-size:17px;font-weight:700;color:var(--primary)">${parseFloat(item.price_eur).toFixed(2)} €</span>
+      </div>
+      ${item.description ? `<div class="hint">${item.description}</div>` : ''}
+      ${tagsHtml}
+      <div class="hint">${item.visible ? '👁️ Visibile' : '🚫 Nascosto'}</div>
+      <div class="row" style="justify-content:flex-end">
+        <button data-act="edit" class="btn">Modifica</button>
+        <button data-act="delete" class="btn danger">Elimina</button>
+      </div>
+    `;
+    
+    card.querySelector('[data-act="edit"]').onclick = () => editItem(item);
+    card.querySelector('[data-act="delete"]').onclick = () => deleteItem(item.id);
+    
+    list.appendChild(card);
+  });
+}
+
+async function editItem(item) {
+  const name = prompt('Nome', item.name) || item.name;
+  const price = prompt('Prezzo (€)', item.price_eur) || item.price_eur;
+  const desc = prompt('Descrizione', item.description || '') || item.description;
+  const visible = confirm('Articolo visibile? OK=sì');
+  
+  try {
+    await apiCall(`/menu/items/${item.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, price_eur: parseFloat(price), description: desc, visible })
+    });
+    toast('Articolo aggiornato');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
+async function deleteItem(itemId) {
+  if (!confirm('Eliminare articolo?')) return;
+  try {
+    await apiCall(`/menu/items/${itemId}`, { method: 'DELETE' });
+    toast('Articolo eliminato');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
+$('#addCategoryBtn').onclick = async () => {
+  const name = $('#newCategoryName').value.trim();
+  if (!name) return alert('Inserisci nome categoria');
+  
+  try {
+    await apiCall('/menu/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name, position: 999 })
+    });
+    $('#newCategoryName').value = '';
+    toast('Categoria aggiunta');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+};
+
+$('#addItemBtn').onclick = async () => {
+  if (!currentCategoryId) return alert('Seleziona una categoria');
+  
+  const name = $('#itemName').value.trim();
+  const price = parseFloat($('#itemPrice').value);
+  if (!name || isNaN(price) || price < 0) return alert('Nome e prezzo validi richiesti');
+  
+  const desc = $('#itemDescription').value.trim();
+  const tags = [];
+  if ($('#itemTagNovita').checked) tags.push('Novità');
+  const visible = $('#itemVisible').checked;
+  
+  try {
+    await apiCall('/menu/items', {
+      method: 'POST',
+      body: JSON.stringify({
+        category_id: currentCategoryId,
+        name,
+        price_eur: price,
+        description: desc,
+        tags,
+        visible,
+        position: 999
+      })
+    });
+    
+    $('#itemName').value = '';
+    $('#itemPrice').value = '';
+    $('#itemDescription').value = '';
+    $('#itemTagNovita').checked = false;
+    $('#itemVisible').checked = true;
+    
+    toast('Articolo aggiunto');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+};
+
+$('#exportMenuJsonBtn').onclick = async () => {
+  try {
+    const { categories, items } = await apiCall('/menu/admin');
+    const blob = new Blob([JSON.stringify({ categories, items }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'menu.json';
+    a.click();
+  } catch (e) {
+    toast('Errore export: ' + e.message);
+  }
+};
+
+$('#importMenuJsonBtn').onclick = () => {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json';
+  inp.onchange = async () => {
+    const file = inp.files[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      alert('Import manuale: usa console SQL D1 per import massivo.');
+    } catch (e) {
+      alert('Errore JSON: ' + e.message);
+    }
+  };
+  inp.click();
+};
+
+// STATISTICHE
+let topItemsChart, tablesOpenedChart;
+
+async function renderStats() {
+  try {
+    const from = $('#statsFrom').value;
+    const to = $('#statsTo').value;
+    
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    
+    const [topItems, tablesOpened, ordersData] = await Promise.all([
+      apiCall(`/stats/top-items?${params}`),
+      apiCall(`/stats/tables-opened?${params}`),
+      apiCall(`/orders?${params}&state=servito`)
+    ]);
+    
+    // Calcola ricavi totali
+    let totalRevenue = 0;
+    let totalOrders = ordersData.orders.length;
+    
+    ordersData.orders.forEach(order => {
+      order.items.forEach(item => {
+        totalRevenue += item.quantity * parseFloat(item.unit_price_eur);
+      });
+    });
+    
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    
+    // Aggiorna KPI
+    $('#totalRevenue').textContent = `${totalRevenue.toFixed(2)} €`;
+    $('#totalOrders').textContent = totalOrders;
+    $('#avgOrderValue').textContent = `${avgOrderValue.toFixed(2)} €`;
+    
+    // Chart Top 10 prodotti
+    const top10 = topItems.top_items.slice(0, 10);
+    
+    if (topItemsChart) topItemsChart.destroy();
+    topItemsChart = new Chart($('#topItemsChart'), {
+      type: 'bar',
+      data: {
+        labels: top10.map(i => i.item_name),
+        datasets: [{
+          label: 'Quantità venduta',
+          data: top10.map(i => i.total),
+          backgroundColor: '#3b82f6',
+          borderRadius: 8
+        }]
+      },
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+    
+    // Chart Tavoli aperti
+    if (tablesOpenedChart) tablesOpenedChart.destroy();
+    tablesOpenedChart = new Chart($('#tablesOpenedChart'), {
+      type: 'line',
+      data: {
+        labels: tablesOpened.tables_opened.map(t => t.day),
+        datasets: [{
+          label: 'Tavoli aperti',
+          data: tablesOpened.tables_opened.map(t => t.count),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.2)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+    
+    // Salva tutti i prodotti per modal
+    window.allProductsData = topItems.top_items;
+    
+  } catch (e) {
+    toast('Errore statistiche: ' + e.message);
+  }
+}
+
+$('#refreshStats').onclick = renderStats;
+
+// Modal prodotti completi
+$('#viewAllProducts').onclick = () => {
+  if (!window.allProductsData || window.allProductsData.length === 0) {
+    alert('Nessun prodotto venduto nel periodo selezionato.');
+    return;
+  }
+  
+  showAllProductsModal(window.allProductsData);
+};
+
+async function showAllProductsModal(products) {
+  // Calcola ricavi per prodotto
+  const from = $('#statsFrom').value;
+  const to = $('#statsTo').value;
+  const params = new URLSearchParams();
+  if (from) params.append('from', from);
+  if (to) params.append('to', to);
+  params.append('state', 'servito');
+  
+  const { orders } = await apiCall(`/orders?${params}`);
+  
+  // Mappa item_name -> ricavo totale
+  const revenueMap = new Map();
+  orders.forEach(order => {
+    order.items.forEach(item => {
+      const revenue = item.quantity * parseFloat(item.unit_price_eur);
+      revenueMap.set(item.item_name, (revenueMap.get(item.item_name) || 0) + revenue);
+    });
+  });
+  
+  // Crea modal
+  const existingModal = $('#allProductsModal');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'allProductsModal';
+  modal.className = 'modal';
+  
+  const productsList = products.map(p => {
+    const revenue = revenueMap.get(p.item_name) || 0;
+    return `
+      <div class="product-item">
+        <span class="product-name">${p.item_name}</span>
+        <span class="product-qty">×${p.total}</span>
+        <span class="product-revenue">${revenue.toFixed(2)} €</span>
+      </div>
+    `;
+  }).join('');
+  
+  const totalRevenue = Array.from(revenueMap.values()).reduce((sum, v) => sum + v, 0);
+  
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h2>Tutti i prodotti venduti</h2>
+      <div class="product-list">
+        ${productsList}
+      </div>
+      <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border);text-align:center">
+        <strong style="font-size:18px">Totale ricavi: ${totalRevenue.toFixed(2)} €</strong>
+      </div>
+      <div style="margin-top:20px;text-align:center">
+        <button id="closeAllProductsModal" class="btn primary">Chiudi</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  $('#closeAllProductsModal').onclick = () => modal.remove();
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+}
+
+$('#exportStatsCsv').onclick = async () => {
+  try {
+    const from = $('#statsFrom').value;
+    const to = $('#statsTo').value;
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    
+    const [topItems, tablesOpened, ordersData] = await Promise.all([
+      apiCall(`/stats/top-items?${params}`),
+      apiCall(`/stats/tables-opened?${params}`),
+      apiCall(`/orders?${params}&state=servito`)
+    ]);
+    
+    // Calcola ricavi
+    const revenueMap = new Map();
+    let totalRevenue = 0;
+    ordersData.orders.forEach(order => {
+      order.items.forEach(item => {
+        const revenue = item.quantity * parseFloat(item.unit_price_eur);
+        revenueMap.set(item.item_name, (revenueMap.get(item.item_name) || 0) + revenue);
+        totalRevenue += revenue;
+      });
+    });
+    
+    let csv = 'STATISTICHE ORDINI\n\n';
+    csv += 'Ricavi totali,' + totalRevenue.toFixed(2) + '\n';
+    csv += 'Ordini serviti,' + ordersData.orders.length + '\n';
+    csv += 'Valore medio ordine,' + (ordersData.orders.length > 0 ? (totalRevenue / ordersData.orders.length).toFixed(2) : 0) + '\n\n';
+    
+    csv += 'PRODOTTI VENDUTI\n';
+    csv += 'prodotto,quantita,ricavi\n';
+    topItems.top_items.forEach(i => {
+      const revenue = revenueMap.get(i.item_name) || 0;
+      csv += `${i.item_name},${i.total},${revenue.toFixed(2)}\n`;
+    });
+    
+    csv += '\nTAVOLI APERTI PER GIORNO\n';
+    csv += 'giorno,tavoli_aperti\n';
+    tablesOpened.tables_opened.forEach(t => csv += `${t.day},${t.count}\n`);
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'statistiche.csv';
+    a.click();
+  } catch (e) {
+    toast('Errore export CSV: ' + e.message);
+  }
+};
+
+// Boot
+async function boot() {
+  try {
+    await renderTables();
+    await renderMenu();
+    await renderStats();
+  } catch (e) {
+    if (e.message.includes('401')) {
+      alert('Password errata o non autorizzato');
+      adminPassword = '';
+      requireLogin();
+    } else {
+      toast('Errore inizializzazione: ' + e.message);
+    }
+  }
+}
+
+// Init
+setupTabs();
+requireLogin();
