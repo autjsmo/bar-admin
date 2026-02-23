@@ -2,6 +2,7 @@
 let adminPassword = '';
 let currentCategoryId = null;
 let ordersRefreshInterval = null;
+let allMenuData = { categories: [], items: [] };
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -138,7 +139,6 @@ async function renderTables() {
         </div>
       `;
       
-      // Click sul titolo per vedere dettagli ordini
       card.querySelector('.table-header').onclick = () => showTableDetails(table.id, table.active_session);
       
       if (table.active_session) {
@@ -152,7 +152,6 @@ async function renderTables() {
       list.appendChild(card);
     }
     
-    // Aggiorna timer ogni minuto
     setTimeout(renderTables, 60000);
   } catch (e) {
     toast('Errore caricamento tavoli: ' + e.message);
@@ -166,19 +165,15 @@ async function showTableDetails(tableId, activeSession) {
   }
   
   try {
-    // Filtra ordini SOLO per la sessione corrente
     const params = new URLSearchParams();
     params.append('session_id', activeSession.id);
     
     const { orders } = await apiCall(`/orders?${params}`);
-    
-    // Controlla se ci sono ordini in attesa
     const pendingOrders = orders.filter(o => o.state === 'richiesta');
     
     if (pendingOrders.length > 0) {
-      // Vai alla sezione ordini e filtra per questo tavolo
       $$('.tab-btn').forEach(b => b.classList.remove('active'));
-      $$('.tab-btn')[1].classList.add('active'); // Ordini è il secondo tab
+      $$('.tab-btn')[1].classList.add('active');
       $$('.tab').forEach(t => t.classList.remove('active'));
       $('#tab-orders').classList.add('active');
       
@@ -189,7 +184,6 @@ async function showTableDetails(tableId, activeSession) {
       
       toast(`${pendingOrders.length} ordine/i in attesa per Tavolo ${tableId}`);
     } else {
-      // Mostra riepilogo sessione completa
       showSessionSummary(tableId, orders, activeSession);
     }
   } catch (e) {
@@ -198,7 +192,6 @@ async function showTableDetails(tableId, activeSession) {
 }
 
 function showSessionSummary(tableId, orders, session) {
-  // Calcola totali
   const servedOrders = orders.filter(o => o.state === 'servito');
   const canceledOrders = orders.filter(o => o.state === 'annullato');
   
@@ -224,7 +217,6 @@ function showSessionSummary(tableId, orders, session) {
     });
   });
   
-  // Crea modal
   const existingModal = $('#sessionSummaryModal');
   if (existingModal) existingModal.remove();
   
@@ -402,6 +394,11 @@ function stopOrdersAutoRefresh() {
   }
 }
 
+function initOrdersDateFilter() {
+  const today = new Date().toISOString().split('T')[0];
+  $('#ordersFilterDate').value = today;
+}
+
 async function renderOrders() {
   try {
     const tableFilter = $('#ordersFilterTable').value;
@@ -414,7 +411,6 @@ async function renderOrders() {
     
     const { orders } = await apiCall(`/orders?${params}`);
     
-    // Filtra per data lato client (se specificata)
     let filteredOrders = orders;
     if (dateFilter) {
       const filterDate = new Date(dateFilter).setHours(0, 0, 0, 0);
@@ -492,122 +488,145 @@ $('#ordersFilterTable').onchange = renderOrders;
 $('#ordersFilterState').onchange = renderOrders;
 $('#ordersFilterDate').onchange = renderOrders;
 
-$('#ordersTodayBtn').onclick = () => {
-  const today = new Date().toISOString().split('T')[0];
-  $('#ordersFilterDate').value = today;
-  renderOrders();
-};
-
 $('#ordersClearDateBtn').onclick = () => {
   $('#ordersFilterDate').value = '';
   renderOrders();
 };
 
-// MENÙ
+// MENÙ - REDESIGN
 async function renderMenu() {
   try {
     const { categories, items } = await apiCall('/menu/admin');
-    
-    const ul = $('#categoryList');
-    ul.innerHTML = '';
-    
-    categories.forEach(cat => {
-      const li = document.createElement('li');
-      li.innerHTML = `
-        <span>${cat.name}</span>
-        <div class="row">
-          <button class="btn" data-act="select">Apri</button>
-          <button class="btn" data-act="rename">Rinomina</button>
-          <button class="btn danger" data-act="delete">Elimina</button>
-        </div>
-      `;
-      
-      li.querySelector('[data-act="select"]').onclick = () => {
-        currentCategoryId = cat.id;
-        renderItems(items.filter(i => i.category_id === cat.id), cat.name);
-      };
-      
-      li.querySelector('[data-act="rename"]').onclick = async () => {
-        const name = prompt('Nuovo nome categoria', cat.name);
-        if (!name) return;
-        try {
-          await apiCall(`/menu/categories/${cat.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ name })
-          });
-          toast('Categoria rinominata');
-          renderMenu();
-        } catch (e) {
-          toast('Errore: ' + e.message);
-        }
-      };
-      
-      li.querySelector('[data-act="delete"]').onclick = async () => {
-        if (!confirm('Eliminare categoria e articoli?')) return;
-        try {
-          await apiCall(`/menu/categories/${cat.id}`, { method: 'DELETE' });
-          toast('Categoria eliminata');
-          renderMenu();
-        } catch (e) {
-          toast('Errore: ' + e.message);
-        }
-      };
-      
-      ul.appendChild(li);
-    });
-    
-    if (!currentCategoryId && categories[0]) {
-      currentCategoryId = categories[0].id;
-      renderItems(items.filter(i => i.category_id === categories[0].id), categories[0].name);
-    }
+    allMenuData = { categories, items };
+    renderCategories();
   } catch (e) {
     toast('Errore caricamento menù: ' + e.message);
   }
 }
 
-function renderItems(items, categoryName) {
-  $('#itemsTitle').textContent = `Articoli · ${categoryName}`;
-  const list = $('#itemsList');
-  list.innerHTML = '';
+function renderCategories() {
+  const grid = $('#categoriesGrid');
+  grid.innerHTML = '';
+  
+  allMenuData.categories.forEach(cat => {
+    const card = document.createElement('div');
+    card.className = 'category-card';
+    if (currentCategoryId === cat.id) card.classList.add('active');
+    
+    const itemsCount = allMenuData.items.filter(i => i.category_id === cat.id).length;
+    
+    card.innerHTML = `
+      <div class="category-name">${cat.name}</div>
+      <div class="hint">${itemsCount} articol${itemsCount !== 1 ? 'i' : 'o'}</div>
+      <div class="category-actions">
+        <button class="btn small" data-act="select">Apri</button>
+        <button class="btn small" data-act="rename">Rinomina</button>
+        <button class="btn small danger" data-act="delete">Elimina</button>
+      </div>
+    `;
+    
+    card.querySelector('[data-act="select"]').onclick = () => selectCategory(cat.id, cat.name);
+    card.querySelector('[data-act="rename"]').onclick = () => renameCategory(cat.id, cat.name);
+    card.querySelector('[data-act="delete"]').onclick = () => deleteCategory(cat.id);
+    
+    grid.appendChild(card);
+  });
+}
+
+function selectCategory(catId, catName) {
+  currentCategoryId = catId;
+  $('#itemsSectionTitle').textContent = `Articoli · ${catName}`;
+  $('#itemsContainer').classList.remove('hidden');
+  renderItems();
+  renderCategories(); // Re-render per evidenziare la categoria attiva
+}
+
+function renderItems() {
+  const grid = $('#itemsList');
+  grid.innerHTML = '';
+  
+  const items = allMenuData.items.filter(i => i.category_id === currentCategoryId);
   
   items.forEach(item => {
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'item-card';
     
     const tags = item.tags ? JSON.parse(item.tags).filter(t => t.toLowerCase() !== 'bio') : [];
-    const tagsHtml = tags.length ? `<div class="hint">🏷️ ${tags.join(' · ')}</div>` : '';
+    const tagsHtml = tags.map(t => `<span class="item-tag">${t}</span>`).join('');
     
     card.innerHTML = `
-      <div class="row" style="justify-content:space-between">
-        <strong>${item.name}</strong>
-        <span style="font-size:17px;font-weight:700;color:var(--primary)">${parseFloat(item.price_eur).toFixed(2)} €</span>
+      <div class="item-header">
+        <div class="item-name">${item.name}</div>
+        <div class="item-price">${parseFloat(item.price_eur).toFixed(2)} €</div>
       </div>
-      ${item.description ? `<div class="hint">${item.description}</div>` : ''}
-      ${tagsHtml}
-      <div class="hint">${item.visible ? '👁️ Visibile' : '🚫 Nascosto'}</div>
-      <div class="row" style="justify-content:flex-end">
-        <button data-act="edit" class="btn">Modifica</button>
-        <button data-act="delete" class="btn danger">Elimina</button>
+      ${item.description ? `<div class="item-description">${item.description}</div>` : ''}
+      ${tags.length ? `<div class="item-tags">${tagsHtml}</div>` : ''}
+      <div class="item-status">${item.visible ? '👁️ Visibile' : '🚫 Nascosto'}</div>
+      <div class="item-actions">
+        <button data-act="edit" class="btn small">Modifica</button>
+        <button data-act="delete" class="btn small danger">Elimina</button>
       </div>
     `;
     
     card.querySelector('[data-act="edit"]').onclick = () => editItem(item);
     card.querySelector('[data-act="delete"]').onclick = () => deleteItem(item.id);
     
-    list.appendChild(card);
+    grid.appendChild(card);
   });
 }
 
+async function renameCategory(catId, oldName) {
+  const name = prompt('Nuovo nome categoria', oldName);
+  if (!name || name === oldName) return;
+  
+  try {
+    await apiCall(`/menu/categories/${catId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name })
+    });
+    toast('Categoria rinominata');
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
+async function deleteCategory(catId) {
+  if (!confirm('Eliminare categoria e tutti gli articoli?')) return;
+  
+  try {
+    await apiCall(`/menu/categories/${catId}`, { method: 'DELETE' });
+    toast('Categoria eliminata');
+    if (currentCategoryId === catId) {
+      currentCategoryId = null;
+      $('#itemsContainer').classList.add('hidden');
+      $('#itemsSectionTitle').textContent = 'Seleziona una categoria per gestire gli articoli';
+    }
+    renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
 async function editItem(item) {
-  const name = prompt('Nome', item.name) || item.name;
-  const price = prompt('Prezzo (€)', item.price_eur) || item.price_eur;
-  const desc = prompt('Descrizione', item.description || '') || item.description;
-  const visible = confirm('Articolo visibile? OK=sì');
+  const name = prompt('Nome', item.name);
+  if (!name) return;
+  
+  const price = prompt('Prezzo (€)', item.price_eur);
+  if (!price) return;
+  
+  const desc = prompt('Descrizione', item.description || '');
+  const visible = confirm('Articolo visibile? OK=sì, Annulla=no');
   
   try {
     await apiCall(`/menu/items/${item.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ name, price_eur: parseFloat(price), description: desc, visible })
+      body: JSON.stringify({ 
+        name, 
+        price_eur: parseFloat(price), 
+        description: desc || null, 
+        visible 
+      })
     });
     toast('Articolo aggiornato');
     renderMenu();
@@ -618,6 +637,7 @@ async function editItem(item) {
 
 async function deleteItem(itemId) {
   if (!confirm('Eliminare articolo?')) return;
+  
   try {
     await apiCall(`/menu/items/${itemId}`, { method: 'DELETE' });
     toast('Articolo eliminato');
@@ -663,7 +683,7 @@ $('#addItemBtn').onclick = async () => {
         category_id: currentCategoryId,
         name,
         price_eur: price,
-        description: desc,
+        description: desc || null,
         tags,
         visible,
         position: 999
@@ -685,8 +705,7 @@ $('#addItemBtn').onclick = async () => {
 
 $('#exportMenuJsonBtn').onclick = async () => {
   try {
-    const { categories, items } = await apiCall('/menu/admin');
-    const blob = new Blob([JSON.stringify({ categories, items }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(allMenuData, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'menu.json';
@@ -733,7 +752,6 @@ async function renderStats() {
       apiCall(`/orders?${params}&state=servito`)
     ]);
     
-    // Calcola ricavi totali
     let totalRevenue = 0;
     let totalOrders = ordersData.orders.length;
     
@@ -745,12 +763,10 @@ async function renderStats() {
     
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     
-    // Aggiorna KPI
     $('#totalRevenue').textContent = `${totalRevenue.toFixed(2)} €`;
     $('#totalOrders').textContent = totalOrders;
     $('#avgOrderValue').textContent = `${avgOrderValue.toFixed(2)} €`;
     
-    // Chart Top 10 prodotti
     const top10 = topItems.top_items.slice(0, 10);
     
     if (topItemsChart) topItemsChart.destroy();
@@ -774,7 +790,6 @@ async function renderStats() {
       }
     });
     
-    // Chart Tavoli aperti
     if (tablesOpenedChart) tablesOpenedChart.destroy();
     tablesOpenedChart = new Chart($('#tablesOpenedChart'), {
       type: 'line',
@@ -798,7 +813,6 @@ async function renderStats() {
       }
     });
     
-    // Salva tutti i prodotti per modal
     window.allProductsData = topItems.top_items;
     
   } catch (e) {
@@ -808,7 +822,6 @@ async function renderStats() {
 
 $('#refreshStats').onclick = renderStats;
 
-// Modal prodotti completi
 $('#viewAllProducts').onclick = () => {
   if (!window.allProductsData || window.allProductsData.length === 0) {
     alert('Nessun prodotto venduto nel periodo selezionato.');
@@ -819,7 +832,6 @@ $('#viewAllProducts').onclick = () => {
 };
 
 async function showAllProductsModal(products) {
-  // Calcola ricavi per prodotto
   const from = $('#statsFrom').value;
   const to = $('#statsTo').value;
   const params = new URLSearchParams();
@@ -829,7 +841,6 @@ async function showAllProductsModal(products) {
   
   const { orders } = await apiCall(`/orders?${params}`);
   
-  // Mappa item_name -> ricavo totale
   const revenueMap = new Map();
   orders.forEach(order => {
     order.items.forEach(item => {
@@ -838,7 +849,6 @@ async function showAllProductsModal(products) {
     });
   });
   
-  // Crea modal
   const existingModal = $('#allProductsModal');
   if (existingModal) existingModal.remove();
   
@@ -896,7 +906,6 @@ $('#exportStatsCsv').onclick = async () => {
       apiCall(`/orders?${params}&state=servito`)
     ]);
     
-    // Calcola ricavi
     const revenueMap = new Map();
     let totalRevenue = 0;
     ordersData.orders.forEach(order => {
@@ -936,6 +945,7 @@ $('#exportStatsCsv').onclick = async () => {
 // Boot
 async function boot() {
   try {
+    initOrdersDateFilter(); // Imposta data odierna di default
     await renderTables();
     await renderMenu();
     await renderStats();
