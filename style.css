@@ -36,10 +36,10 @@ main{padding:20px;max-width:1400px;margin:0 auto;padding-bottom:100px}
 .card h4{margin:0 0 16px 0;font-size:16px;color:var(--text);font-weight:600}
 
 .add-card{border:2px dashed var(--border);background:var(--bg)}
-.add-item-card{border:2px dashed var(--border);background:var(--bg);margin-top:20px}
-.footer-actions{background:var(--bg);border:1px solid var(--border)}
+.add-item-card{border:2px dashed var(--border);background:var(--bg);padding:20px;margin-bottom:20px}
 
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.form-row{display:flex;gap:12px;margin-bottom:12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:20px}
 .list{display:flex;flex-direction:column;gap:16px}
 .form-group{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}
@@ -59,6 +59,7 @@ input[type="checkbox"]{width:auto;margin-right:8px}
 .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
 .btn.warn{background:var(--warn);border-color:var(--warn);color:#fff}
 .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.small{padding:8px 16px;font-size:14px}
 
 .badge{display:inline-block;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:0.3px}
 .badge.open{background:#dcfce7;color:#166534;border:2px solid #22c55e}
@@ -80,12 +81,28 @@ input[type="checkbox"]{width:auto;margin-right:8px}
 .order-card .order-items{background:var(--bg);border-radius:12px;padding:16px;margin:12px 0;font-size:15px;line-height:1.8;border:1px solid var(--border)}
 .order-card .order-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 
-.menu-layout{display:grid;grid-template-columns:300px 1fr;gap:24px}
-#categoryList{list-style:none;padding:0;margin:0}
-#categoryList li{display:flex;justify-content:space-between;align-items:center;padding:16px;border:2px solid var(--border);border-radius:12px;margin-bottom:12px;flex-wrap:wrap;gap:12px;background:var(--card);transition:all .2s}
-#categoryList li:hover{box-shadow:var(--shadow-lg)}
-#categoryList li span:first-child{flex:1;min-width:120px;font-weight:600;font-size:15px}
-#categoryList li .row{margin:0}
+/* MENU REDESIGN */
+.menu-section{margin:32px 0;padding:24px 0;border-bottom:2px solid var(--border)}
+.menu-section:last-child{border-bottom:none}
+
+.categories-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-top:20px}
+.category-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:20px;transition:all .2s;cursor:pointer}
+.category-card:hover{box-shadow:var(--shadow-lg);border-color:var(--primary)}
+.category-card.active{border-color:var(--primary);background:rgba(59,130,246,.05)}
+.category-card .category-name{font-size:18px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.category-card .category-actions{display:flex;gap:8px}
+
+.items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px}
+.item-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:20px;transition:all .2s}
+.item-card:hover{box-shadow:var(--shadow-lg)}
+.item-card .item-header{display:flex;justify-content:space-between;align-items:start;margin-bottom:12px}
+.item-card .item-name{font-size:16px;font-weight:700;color:var(--text);flex:1}
+.item-card .item-price{font-size:18px;font-weight:900;color:var(--primary);white-space:nowrap;margin-left:12px}
+.item-card .item-description{color:var(--muted);font-size:14px;margin-bottom:8px;line-height:1.5}
+.item-card .item-tags{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.item-card .item-tag{background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.item-card .item-status{font-size:13px;color:var(--muted);margin-bottom:12px}
+.item-card .item-actions{display:flex;gap:8px}
 
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}
 .modal-content{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
@@ -153,7 +170,7 @@ input[type="checkbox"]{width:auto;margin-right:8px}
   .tabs{position:fixed;bottom:0;left:0;right:0;border-top:2px solid var(--border);border-bottom:none;z-index:100;background:var(--card)}
   .tab-btn{font-size:12px}
   .tab-btn .tab-icon{font-size:22px}
-  .menu-layout{grid-template-columns:1fr}
+  .categories-grid,.items-grid{grid-template-columns:1fr}
   .grid{grid-template-columns:1fr}
   .charts-grid{grid-template-columns:1fr}
   main{padding-bottom:100px}
