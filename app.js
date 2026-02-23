@@ -72,10 +72,12 @@ function formatElapsedTime(openedAt) {
   return `${mins}m`;
 }
 
-async function checkPendingOrders(tableId) {
+async function checkPendingOrders(tableId, sessionId) {
   try {
+    if (!sessionId) return false;
+    
     const params = new URLSearchParams();
-    params.append('table_id', tableId);
+    params.append('session_id', sessionId);
     params.append('state', 'richiesta');
     const { orders } = await apiCall(`/orders?${params}`);
     return orders.length > 0;
@@ -111,7 +113,7 @@ async function renderTables() {
       
       if (table.active_session) {
         const elapsed = formatElapsedTime(table.active_session.opened_at);
-        const hasPending = await checkPendingOrders(table.id);
+        const hasPending = await checkPendingOrders(table.id, table.active_session.id);
         
         if (hasPending) {
           badge = `<span class="badge has-pending">In sessione · PIN ${table.active_session.pin}</span>`;
@@ -404,21 +406,33 @@ async function renderOrders() {
   try {
     const tableFilter = $('#ordersFilterTable').value;
     const stateFilter = $('#ordersFilterState').value;
+    const dateFilter = $('#ordersFilterDate').value;
     
     const params = new URLSearchParams();
     if (tableFilter) params.append('table_id', tableFilter);
     if (stateFilter) params.append('state', stateFilter);
     
     const { orders } = await apiCall(`/orders?${params}`);
+    
+    // Filtra per data lato client (se specificata)
+    let filteredOrders = orders;
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter).setHours(0, 0, 0, 0);
+      filteredOrders = orders.filter(order => {
+        const orderDate = new Date(order.created_at).setHours(0, 0, 0, 0);
+        return orderDate === filterDate;
+      });
+    }
+    
     const list = $('#ordersList');
     list.innerHTML = '';
     
-    if (orders.length === 0) {
+    if (filteredOrders.length === 0) {
       list.innerHTML = '<div class="card"><p class="hint">Nessun ordine trovato.</p></div>';
       return;
     }
     
-    orders.forEach(order => {
+    filteredOrders.forEach(order => {
       const card = document.createElement('div');
       let cardClass = 'order-card pending';
       if (order.state === 'servito') cardClass = 'order-card servito';
@@ -476,6 +490,18 @@ async function changeOrderState(orderId, newState) {
 
 $('#ordersFilterTable').onchange = renderOrders;
 $('#ordersFilterState').onchange = renderOrders;
+$('#ordersFilterDate').onchange = renderOrders;
+
+$('#ordersTodayBtn').onclick = () => {
+  const today = new Date().toISOString().split('T')[0];
+  $('#ordersFilterDate').value = today;
+  renderOrders();
+};
+
+$('#ordersClearDateBtn').onclick = () => {
+  $('#ordersFilterDate').value = '';
+  renderOrders();
+};
 
 // MENÙ
 async function renderMenu() {
