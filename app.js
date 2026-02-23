@@ -538,7 +538,7 @@ function selectCategory(catId, catName) {
   $('#itemsSectionTitle').textContent = `Articoli · ${catName}`;
   $('#itemsContainer').classList.remove('hidden');
   renderItems();
-  renderCategories(); // Re-render per evidenziare la categoria attiva
+  renderCategories();
 }
 
 function renderItems() {
@@ -945,10 +945,10 @@ $('#exportStatsCsv').onclick = async () => {
 // Boot
 async function boot() {
   try {
-    initOrdersDateFilter(); // Imposta data odierna di default
     await renderTables();
     await renderMenu();
     await renderStats();
+    initOrdersDateFilter();
   } catch (e) {
     if (e.message.includes('401')) {
       alert('Password errata o non autorizzato');
