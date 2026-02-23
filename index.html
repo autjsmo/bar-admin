@@ -69,9 +69,8 @@
             <option value="servito">Servito</option>
             <option value="annullato">Annullato</option>
           </select>
-          <input type="date" id="ordersFilterDate" placeholder="Filtra per data">
-          <button id="ordersTodayBtn" class="btn">Oggi</button>
-          <button id="ordersClearDateBtn" class="btn">Cancella filtro</button>
+          <input type="date" id="ordersFilterDate">
+          <button id="ordersClearDateBtn" class="btn">Tutti i giorni</button>
         </div>
       </div>
       <div id="ordersList" class="list"></div>
@@ -81,39 +80,45 @@
     <section id="tab-menu" class="tab">
       <div class="card">
         <h2>Gestione Menù</h2>
-        <div class="menu-layout">
-          <aside>
-            <h3>Categorie</h3>
-            <ul id="categoryList"></ul>
-            <div class="form-group">
-              <input id="newCategoryName" placeholder="Nuova categoria">
-              <button id="addCategoryBtn" class="btn primary">Aggiungi</button>
-            </div>
-          </aside>
-          <section class="menu-items">
-            <h3 id="itemsTitle">Articoli</h3>
-            <div id="itemsList" class="list"></div>
+        
+        <!-- Gestione Categorie -->
+        <div class="menu-section">
+          <h3>Categorie</h3>
+          <div class="form-group">
+            <input id="newCategoryName" placeholder="Nome nuova categoria" style="flex:1">
+            <button id="addCategoryBtn" class="btn primary">Aggiungi categoria</button>
+          </div>
+          <div id="categoriesGrid" class="categories-grid"></div>
+        </div>
+
+        <!-- Gestione Articoli -->
+        <div class="menu-section">
+          <h3 id="itemsSectionTitle">Seleziona una categoria per gestire gli articoli</h3>
+          <div id="itemsContainer" class="hidden">
             <div class="card add-item-card">
-              <h4>Aggiungi articolo</h4>
-              <div class="form-group">
-                <input id="itemName" placeholder="Nome articolo">
-                <input id="itemPrice" type="number" step="0.01" min="0" placeholder="Prezzo (€)" inputmode="decimal">
+              <h4>Aggiungi nuovo articolo</h4>
+              <div class="form-row">
+                <input id="itemName" placeholder="Nome articolo" style="flex:2">
+                <input id="itemPrice" type="number" step="0.01" min="0" placeholder="Prezzo (€)" inputmode="decimal" style="flex:1">
               </div>
-              <textarea id="itemDescription" placeholder="Descrizione (facoltativa)"></textarea>
+              <textarea id="itemDescription" placeholder="Descrizione (facoltativa)" rows="2"></textarea>
               <div class="row">
                 <label><input type="checkbox" id="itemTagNovita"> Novità</label>
                 <label><input type="checkbox" id="itemVisible" checked> Visibile</label>
               </div>
               <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
             </div>
-          </section>
+            <div id="itemsList" class="items-grid"></div>
+          </div>
         </div>
-      </div>
-      <div class="card footer-actions">
-        <h3>Importa/Esporta</h3>
-        <div class="row">
-          <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
-          <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
+
+        <!-- Import/Export -->
+        <div class="menu-section">
+          <h3>Importa/Esporta</h3>
+          <div class="row">
+            <button id="importMenuJsonBtn" class="btn">Importa JSON</button>
+            <button id="exportMenuJsonBtn" class="btn">Esporta JSON</button>
+          </div>
         </div>
       </div>
     </section>
