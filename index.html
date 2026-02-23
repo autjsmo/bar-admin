@@ -96,17 +96,32 @@
           <h3 id="itemsSectionTitle">Seleziona una categoria per gestire gli articoli</h3>
           <div id="itemsContainer" class="hidden">
             <div class="card add-item-card">
-              <h4>Aggiungi nuovo articolo</h4>
+              <h4 id="itemFormTitle">Aggiungi nuovo articolo</h4>
+              <input type="hidden" id="editingItemId" value="">
               <div class="form-row">
                 <input id="itemName" placeholder="Nome articolo" style="flex:2">
                 <input id="itemPrice" type="number" step="0.01" min="0" placeholder="Prezzo (€)" inputmode="decimal" style="flex:1">
               </div>
               <textarea id="itemDescription" placeholder="Descrizione (facoltativa)" rows="2"></textarea>
-              <div class="row">
-                <label><input type="checkbox" id="itemTagNovita"> Novità</label>
-                <label><input type="checkbox" id="itemVisible" checked> Visibile</label>
+              
+              <!-- Tag personalizzati -->
+              <div class="tags-input-section">
+                <label style="display:block;margin-bottom:8px;font-weight:600">Tag personalizzati</label>
+                <div class="form-row">
+                  <input id="newTagText" placeholder="Testo tag (es. Novità, Piccante)" style="flex:2">
+                  <input id="newTagColor" type="color" value="#3b82f6" style="width:60px">
+                  <button id="addTagBtn" class="btn small">Aggiungi tag</button>
+                </div>
+                <div id="selectedTags" class="selected-tags"></div>
               </div>
-              <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
+              
+              <div class="row">
+                <label><input type="checkbox" id="itemVisible" checked> Visibile nel menù</label>
+              </div>
+              <div class="row">
+                <button id="addItemBtn" class="btn primary">Aggiungi articolo</button>
+                <button id="cancelEditBtn" class="btn hidden">Annulla</button>
+              </div>
             </div>
             <div id="itemsList" class="items-grid"></div>
           </div>
