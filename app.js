@@ -3,6 +3,8 @@ let adminPassword = '';
 let currentCategoryId = null;
 let ordersRefreshInterval = null;
 let allMenuData = { categories: [], items: [] };
+let selectedTags = [];
+let editingItemId = null;
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -487,13 +489,15 @@ $('#ordersClearDateBtn').onclick = () => {
   $('#ordersFilterDate').value = '';
   renderOrders();
 };
-
-// MENÙ - REDESIGN
+// MENÙ - REDESIGN CON TAG PERSONALIZZATI
 async function renderMenu() {
   try {
     const { categories, items } = await apiCall('/menu/admin');
     allMenuData = { categories, items };
     renderCategories();
+    if (currentCategoryId) {
+      renderItems();
+    }
   } catch (e) {
     toast('Errore caricamento menù: ' + e.message);
   }
@@ -532,6 +536,7 @@ function selectCategory(catId, catName) {
   currentCategoryId = catId;
   $('#itemsSectionTitle').textContent = `Articoli · ${catName}`;
   $('#itemsContainer').classList.remove('hidden');
+  resetItemForm();
   renderItems();
   renderCategories();
 }
@@ -546,8 +551,11 @@ function renderItems() {
     const card = document.createElement('div');
     card.className = 'item-card';
     
-    const tags = item.tags ? JSON.parse(item.tags).filter(t => t.toLowerCase() !== 'bio') : [];
-    const tagsHtml = tags.map(t => `<span class="item-tag">${t}</span>`).join('');
+    const tags = item.tags ? JSON.parse(item.tags) : [];
+    const tagsHtml = tags.map(t => {
+      const tagData = typeof t === 'string' ? { text: t, color: '#3b82f6' } : t;
+      return `<span class="item-tag" style="background:${tagData.color}">${tagData.text}</span>`;
+    }).join('');
     
     card.innerHTML = `
       <div class="item-header">
@@ -570,6 +578,53 @@ function renderItems() {
   });
 }
 
+function resetItemForm() {
+  editingItemId = null;
+  $('#editingItemId').value = '';
+  $('#itemFormTitle').textContent = 'Aggiungi nuovo articolo';
+  $('#itemName').value = '';
+  $('#itemPrice').value = '';
+  $('#itemDescription').value = '';
+  $('#itemVisible').checked = true;
+  selectedTags = [];
+  renderSelectedTags();
+  $('#addItemBtn').textContent = 'Aggiungi articolo';
+  $('#cancelEditBtn').classList.add('hidden');
+}
+
+function editItem(item) {
+  editingItemId = item.id;
+  $('#editingItemId').value = item.id;
+  $('#itemFormTitle').textContent = 'Modifica articolo';
+  $('#itemName').value = item.name;
+  $('#itemPrice').value = item.price_eur;
+  $('#itemDescription').value = item.description || '';
+  $('#itemVisible').checked = item.visible;
+  
+  selectedTags = item.tags ? JSON.parse(item.tags) : [];
+  // Converti vecchi tag stringa in oggetti
+  selectedTags = selectedTags.map(t => typeof t === 'string' ? { text: t, color: '#3b82f6' } : t);
+  
+  renderSelectedTags();
+  $('#addItemBtn').textContent = 'Salva modifiche';
+  $('#cancelEditBtn').classList.remove('hidden');
+  
+  // Scrolla al form
+  $('#itemsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteItem(itemId) {
+  if (!confirm('Eliminare articolo?')) return;
+  
+  try {
+    await apiCall(`/menu/items/${itemId}`, { method: 'DELETE' });
+    toast('Articolo eliminato');
+    await renderMenu();
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
+}
+
 async function renameCategory(catId, oldName) {
   const name = prompt('Nuovo nome categoria', oldName);
   if (!name || name === oldName) return;
@@ -580,7 +635,7 @@ async function renameCategory(catId, oldName) {
       body: JSON.stringify({ name })
     });
     toast('Categoria rinominata');
-    renderMenu();
+    await renderMenu();
   } catch (e) {
     toast('Errore: ' + e.message);
   }
@@ -597,50 +652,47 @@ async function deleteCategory(catId) {
       $('#itemsContainer').classList.add('hidden');
       $('#itemsSectionTitle').textContent = 'Seleziona una categoria per gestire gli articoli';
     }
-    renderMenu();
+    await renderMenu();
   } catch (e) {
     toast('Errore: ' + e.message);
   }
 }
 
-async function editItem(item) {
-  const name = prompt('Nome', item.name);
-  if (!name) return;
+// TAG MANAGEMENT
+function renderSelectedTags() {
+  const container = $('#selectedTags');
+  container.innerHTML = '';
   
-  const price = prompt('Prezzo (€)', item.price_eur);
-  if (!price) return;
-  
-  const desc = prompt('Descrizione', item.description || '');
-  const visible = confirm('Articolo visibile? OK=sì, Annulla=no');
-  
-  try {
-    await apiCall(`/menu/items/${item.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ 
-        name, 
-        price_eur: parseFloat(price), 
-        description: desc || null, 
-        visible 
-      })
-    });
-    toast('Articolo aggiornato');
-    renderMenu();
-  } catch (e) {
-    toast('Errore: ' + e.message);
-  }
+  selectedTags.forEach((tag, index) => {
+    const tagEl = document.createElement('span');
+    tagEl.className = 'selected-tag';
+    tagEl.style.background = tag.color;
+    tagEl.innerHTML = `
+      ${tag.text}
+      <span class="remove-tag" data-index="${index}">✕</span>
+    `;
+    
+    tagEl.querySelector('.remove-tag').onclick = () => {
+      selectedTags.splice(index, 1);
+      renderSelectedTags();
+    };
+    
+    container.appendChild(tagEl);
+  });
 }
 
-async function deleteItem(itemId) {
-  if (!confirm('Eliminare articolo?')) return;
+$('#addTagBtn').onclick = () => {
+  const text = $('#newTagText').value.trim();
+  const color = $('#newTagColor').value;
   
-  try {
-    await apiCall(`/menu/items/${itemId}`, { method: 'DELETE' });
-    toast('Articolo eliminato');
-    renderMenu();
-  } catch (e) {
-    toast('Errore: ' + e.message);
-  }
-}
+  if (!text) return alert('Inserisci il testo del tag');
+  
+  selectedTags.push({ text, color });
+  renderSelectedTags();
+  
+  $('#newTagText').value = '';
+  $('#newTagColor').value = '#3b82f6';
+};
 
 $('#addCategoryBtn').onclick = async () => {
   const name = $('#newCategoryName').value.trim();
@@ -653,7 +705,7 @@ $('#addCategoryBtn').onclick = async () => {
     });
     $('#newCategoryName').value = '';
     toast('Categoria aggiunta');
-    renderMenu();
+    await renderMenu();
   } catch (e) {
     toast('Errore: ' + e.message);
   }
@@ -667,35 +719,44 @@ $('#addItemBtn').onclick = async () => {
   if (!name || isNaN(price) || price < 0) return alert('Nome e prezzo validi richiesti');
   
   const desc = $('#itemDescription').value.trim();
-  const tags = [];
-  if ($('#itemTagNovita').checked) tags.push('Novità');
   const visible = $('#itemVisible').checked;
   
+  const itemData = {
+    category_id: currentCategoryId,
+    name,
+    price_eur: price,
+    description: desc || null,
+    tags: selectedTags,
+    visible,
+    position: 999
+  };
+  
   try {
-    await apiCall('/menu/items', {
-      method: 'POST',
-      body: JSON.stringify({
-        category_id: currentCategoryId,
-        name,
-        price_eur: price,
-        description: desc || null,
-        tags,
-        visible,
-        position: 999
-      })
-    });
+    if (editingItemId) {
+      // MODIFICA
+      await apiCall(`/menu/items/${editingItemId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(itemData)
+      });
+      toast('Articolo modificato');
+    } else {
+      // AGGIUNGI
+      await apiCall('/menu/items', {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      });
+      toast('Articolo aggiunto');
+    }
     
-    $('#itemName').value = '';
-    $('#itemPrice').value = '';
-    $('#itemDescription').value = '';
-    $('#itemTagNovita').checked = false;
-    $('#itemVisible').checked = true;
-    
-    toast('Articolo aggiunto');
-    renderMenu();
+    resetItemForm();
+    await renderMenu();
   } catch (e) {
     toast('Errore: ' + e.message);
   }
+};
+
+$('#cancelEditBtn').onclick = () => {
+  resetItemForm();
 };
 
 $('#exportMenuJsonBtn').onclick = async () => {
