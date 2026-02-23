@@ -51,6 +51,7 @@ input,textarea,select{background:var(--card);border:2px solid var(--border);colo
 input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 textarea{min-height:90px;resize:vertical;width:100%}
 input[type="checkbox"]{width:auto;margin-right:8px}
+input[type="color"]{padding:4px;height:48px;cursor:pointer}
 
 .btn{background:var(--card);color:var(--text);border:2px solid var(--border);border-radius:12px;padding:12px 24px;cursor:pointer;font-size:15px;font-weight:600;transition:all .2s;box-shadow:var(--shadow)}
 .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
@@ -100,9 +101,16 @@ input[type="checkbox"]{width:auto;margin-right:8px}
 .item-card .item-price{font-size:18px;font-weight:900;color:var(--primary);white-space:nowrap;margin-left:12px}
 .item-card .item-description{color:var(--muted);font-size:14px;margin-bottom:8px;line-height:1.5}
 .item-card .item-tags{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.item-card .item-tag{background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.item-card .item-tag{padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;color:#fff}
 .item-card .item-status{font-size:13px;color:var(--muted);margin-bottom:12px}
 .item-card .item-actions{display:flex;gap:8px}
+
+/* Tags input */
+.tags-input-section{margin:16px 0;padding:16px;background:var(--bg);border-radius:12px;border:2px dashed var(--border)}
+.selected-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;min-height:36px}
+.selected-tag{padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+.selected-tag .remove-tag{cursor:pointer;font-weight:900;opacity:0.8}
+.selected-tag .remove-tag:hover{opacity:1}
 
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}
 .modal-content{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
