@@ -394,11 +394,6 @@ function stopOrdersAutoRefresh() {
   }
 }
 
-function initOrdersDateFilter() {
-  const today = new Date().toISOString().split('T')[0];
-  $('#ordersFilterDate').value = today;
-}
-
 async function renderOrders() {
   try {
     const tableFilter = $('#ordersFilterTable').value;
@@ -948,16 +943,25 @@ async function boot() {
     await renderTables();
     await renderMenu();
     await renderStats();
-    initOrdersDateFilter();
   } catch (e) {
     if (e.message.includes('401')) {
       alert('Password errata o non autorizzato');
       adminPassword = '';
       requireLogin();
+      return;
     } else {
       toast('Errore inizializzazione: ' + e.message);
+      return;
     }
   }
+  
+  // Imposta data odierna SOLO se boot ha successo
+  setTimeout(() => {
+    if ($('#ordersFilterDate')) {
+      const today = new Date().toISOString().split('T')[0];
+      $('#ordersFilterDate').value = today;
+    }
+  }, 100);
 }
 
 // Init
